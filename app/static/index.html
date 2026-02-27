@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Socratic Review</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+  <!-- Header -->
+  <header>
+    <div class="header-inner">
+      <span class="logo">Socratic Review</span>
+      <div id="header-meta" class="hidden">
+        <span class="header-tag">前田さん ＋ 石川さん</span>
+        <button class="btn-reset" onclick="resetSession()">新しい資料</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ① Input Phase -->
+  <div id="input-phase" class="phase active">
+    <div class="input-container">
+      <h1 class="title">資料を貼り付けてレビューを受ける</h1>
+      <p class="subtitle">
+        前田さん（全体設計・読み手視点）と石川さん（ページ詳細・技術精度）の2名が、<br>
+        ソクラテス式の問いかけでレビューします。答えではなく、問いを返します。
+      </p>
+
+      <div class="reviewer-legend">
+        <div class="reviewer-pill maeda-pill">
+          <span class="pill-icon maeda-icon">M</span>
+          <div>
+            <div class="pill-name">前田さん</div>
+            <div class="pill-desc">全体構成・読み手の認識・ストーリーライン</div>
+          </div>
+        </div>
+        <div class="reviewer-pill ishikawa-pill">
+          <span class="pill-icon ishikawa-icon">I</span>
+          <div>
+            <div class="pill-name">石川さん</div>
+            <div class="pill-desc">So what・主語・用語・数値整合・リスク先読み</div>
+          </div>
+        </div>
+      </div>
+
+      <textarea
+        id="doc-input"
+        placeholder="スライドの内容、提案書、定例資料など、レビューしたい内容を貼り付けてください..."
+      ></textarea>
+
+      <button id="start-btn" class="btn-start" onclick="startSession()">
+        レビューを受ける
+      </button>
+    </div>
+  </div>
+
+  <!-- ② Chat Phase -->
+  <div id="chat-phase" class="phase">
+    <div id="chat-messages"></div>
+
+    <div id="input-wrapper">
+      <div id="input-row">
+        <textarea
+          id="msg-input"
+          placeholder="返答を入力…（Shift+Enter で改行）"
+          rows="2"
+        ></textarea>
+        <button id="send-btn" onclick="sendMessage()">送信</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
