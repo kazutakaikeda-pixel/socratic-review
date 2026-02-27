@@ -1,13 +1,48 @@
+/* ─── Phase Config ──────────────────────────────────────── */
+const PHASES = {
+  1: {
+    name: 'Phase 1 — 作成前',
+    hint: '貼り付けるもの: Notionのメモ・ブレスト・方向性をまとめたテキストなど。まだスライドになっていないもの。',
+    placeholder: 'Notionの文章、ブレストメモ、方向性をまとめたテキストなどを貼り付けてください...',
+  },
+  2: {
+    name: 'Phase 2 — 構成',
+    hint: '貼り付けるもの: スライドの目次・アジェンダ・各ページのタイトルや概要。ストーリーラインがわかるもの。',
+    placeholder: 'スライドの目次、アジェンダ、各ページのタイトルや概要などを貼り付けてください...',
+  },
+  3: {
+    name: 'Phase 3 — ビジュアル',
+    hint: '貼り付けるもの: 完成に近い資料のテキスト・数値・図の説明など。表現・整合性の細かいレビューをします。',
+    placeholder: '各スライドのテキスト・数値・図の説明など、完成に近い資料の内容を貼り付けてください...',
+  },
+};
+
 /* ─── State ─────────────────────────────────────────────── */
 const state = {
-  sessionId: null,
+  sessionId:   null,
+  phase:       1,
   isStreaming: false,
 };
+
+/* ─── Phase Selection ───────────────────────────────────── */
+function selectPhase(phase) {
+  state.phase = phase;
+
+  // Update step buttons
+  document.querySelectorAll('.phase-step').forEach(btn => {
+    btn.classList.toggle('active', parseInt(btn.dataset.phase) === phase);
+  });
+
+  // Update hint and placeholder
+  const cfg = PHASES[phase];
+  document.getElementById('phase-hint').textContent = cfg.hint;
+  document.getElementById('doc-input').placeholder  = cfg.placeholder;
+}
 
 /* ─── Start Session ─────────────────────────────────────── */
 async function startSession() {
   const docInput = document.getElementById('doc-input');
-  const content = docInput.value.trim();
+  const content  = docInput.value.trim();
   if (!content) {
     docInput.focus();
     docInput.style.borderColor = '#f09090';
@@ -16,20 +51,20 @@ async function startSession() {
   }
 
   const btn = document.getElementById('start-btn');
-  btn.disabled = true;
+  btn.disabled    = true;
   btn.textContent = '読み込み中…';
 
   let data;
   try {
     const res = await fetch('/api/sessions', {
-      method: 'POST',
+      method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ document: content }),
+      body:    JSON.stringify({ document: content, phase: state.phase }),
     });
-    if (!res.ok) throw new Error('Failed to create session');
+    if (!res.ok) throw new Error('Failed');
     data = await res.json();
-  } catch (e) {
-    btn.disabled = false;
+  } catch {
+    btn.disabled    = false;
     btn.textContent = 'レビューを受ける';
     alert('接続エラーが発生しました。サーバーが起動しているか確認してください。');
     return;
@@ -40,10 +75,14 @@ async function startSession() {
   // Switch to chat phase
   document.getElementById('input-phase').classList.remove('active');
   document.getElementById('chat-phase').classList.add('active');
-  document.getElementById('header-meta').classList.remove('hidden');
 
-  // Show opening messages from both reviewers
-  appendReviewerMessage('maeda', data.maeda_opening);
+  // Update header
+  const meta = document.getElementById('header-meta');
+  meta.classList.remove('hidden');
+  document.getElementById('header-phase-badge').textContent = PHASES[state.phase].name;
+
+  // Show opening messages
+  appendReviewerMessage('maeda',    data.maeda_opening);
   appendReviewerMessage('ishikawa', data.ishikawa_opening);
 
   document.getElementById('msg-input').focus();
@@ -51,18 +90,18 @@ async function startSession() {
 
 /* ─── Reset ─────────────────────────────────────────────── */
 function resetSession() {
-  state.sessionId = null;
+  state.sessionId   = null;
   state.isStreaming = false;
 
   document.getElementById('chat-phase').classList.remove('active');
   document.getElementById('input-phase').classList.add('active');
   document.getElementById('header-meta').classList.add('hidden');
   document.getElementById('chat-messages').innerHTML = '';
-  document.getElementById('doc-input').value = '';
+  document.getElementById('doc-input').value         = '';
 
-  const startBtn = document.getElementById('start-btn');
-  startBtn.disabled = false;
-  startBtn.textContent = 'レビューを受ける';
+  const btn = document.getElementById('start-btn');
+  btn.disabled    = false;
+  btn.textContent = 'レビューを受ける';
 
   document.getElementById('doc-input').focus();
 }
@@ -71,17 +110,16 @@ function resetSession() {
 async function sendMessage() {
   if (state.isStreaming || !state.sessionId) return;
 
-  const input = document.getElementById('msg-input');
+  const input   = document.getElementById('msg-input');
   const content = input.value.trim();
   if (!content) return;
 
-  input.value = '';
+  input.value       = '';
   input.style.height = 'auto';
 
-  // Show user message
   appendUserMessage(content);
 
-  // Add a subtle turn separator
+  // Turn separator
   const sep = document.createElement('div');
   sep.className = 'turn-separator';
   document.getElementById('chat-messages').appendChild(sep);
@@ -92,22 +130,23 @@ async function sendMessage() {
   let res;
   try {
     res = await fetch(`/api/sessions/${state.sessionId}/messages`, {
-      method: 'POST',
+      method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ content }),
+      body:    JSON.stringify({ content }),
     });
-  } catch (e) {
+  } catch {
     state.isStreaming = false;
     document.getElementById('send-btn').disabled = false;
     return;
   }
 
-  // State machine for SSE streaming
-  let currentReviewer = null;
-  let currentMessageEl = null;
-  let loadingEl = null;
+  // SSE state machine
+  let currentReviewer  = null;
+  let currentMsgEl     = null;
+  let loadingEl        = null;
+  let fullText         = '';
 
-  const reader = res.body.getReader();
+  const reader  = res.body.getReader();
   const decoder = new TextDecoder();
   let buf = '';
 
@@ -117,7 +156,7 @@ async function sendMessage() {
 
     buf += decoder.decode(value, { stream: true });
     const lines = buf.split('\n');
-    buf = lines.pop(); // keep partial line
+    buf = lines.pop();
 
     for (const line of lines) {
       if (!line.startsWith('data: ')) continue;
@@ -126,34 +165,36 @@ async function sendMessage() {
 
       if (event.type === 'start') {
         currentReviewer = event.reviewer;
-        // Show loading dots while waiting for first token
-        loadingEl = appendLoadingDots(currentReviewer);
-        currentMessageEl = null;
+        fullText        = '';
+        loadingEl       = appendLoadingDots(currentReviewer);
+        currentMsgEl    = null;
 
       } else if (event.type === 'token') {
-        // First token: remove loading dots, create message bubble
         if (loadingEl) {
           loadingEl.remove();
-          loadingEl = null;
-          currentMessageEl = appendReviewerMessage(event.reviewer, '');
-          currentMessageEl.classList.add('streaming');
+          loadingEl    = null;
+          currentMsgEl = appendReviewerMessage(event.reviewer, '');
+          currentMsgEl.classList.add('streaming');
         }
-        if (currentMessageEl) {
-          const bubble = currentMessageEl.querySelector('.msg-bubble');
-          bubble.textContent += event.content;
+        if (currentMsgEl) {
+          fullText += event.content;
+          const bubble = currentMsgEl.querySelector('.msg-bubble');
+          bubble.textContent = fullText;
           scrollToBottom();
         }
 
       } else if (event.type === 'end') {
-        if (currentMessageEl) {
-          currentMessageEl.classList.remove('streaming');
+        if (currentMsgEl) {
+          currentMsgEl.classList.remove('streaming');
+          // Apply GOOD/MORE highlighting after streaming
+          renderGoodMore(currentMsgEl.querySelector('.msg-bubble'), fullText);
         }
         currentReviewer = null;
-        currentMessageEl = null;
+        currentMsgEl    = null;
 
       } else if (event.type === 'error') {
         if (loadingEl) { loadingEl.remove(); loadingEl = null; }
-        appendErrorMessage(event.reviewer || currentReviewer);
+        appendErrorMessage(currentReviewer);
 
       } else if (event.type === 'done') {
         break;
@@ -167,23 +208,47 @@ async function sendMessage() {
   scrollToBottom();
 }
 
+/* ─── GOOD / MORE Rendering ─────────────────────────────── */
+function renderGoodMore(bubbleEl, text) {
+  if (!text.includes('✓ GOOD') && !text.includes('→ MORE')) return;
+
+  const lines = text.split('\n');
+  bubbleEl.innerHTML = '';
+
+  for (const line of lines) {
+    const span = document.createElement('span');
+    span.style.display = 'block';
+
+    if (line.startsWith('✓ GOOD')) {
+      span.className   = 'good-line';
+      span.textContent = line;
+    } else if (line.startsWith('→ MORE')) {
+      span.className   = 'more-line';
+      span.style.marginTop = '8px';
+      span.textContent = line;
+    } else {
+      span.textContent = line;
+    }
+    bubbleEl.appendChild(span);
+  }
+}
+
 /* ─── DOM Helpers ───────────────────────────────────────── */
 function appendReviewerMessage(reviewer, text) {
-  const isM = reviewer === 'maeda';
-  const name = isM ? '前田さん' : '石川さん';
-  const avatarClass = isM ? 'maeda-av' : 'ishikawa-av';
-  const initial = isM ? 'M' : 'I';
-  const bubbleClass = isM ? 'maeda-bubble' : 'ishikawa-bubble';
+  const isM        = reviewer === 'maeda';
+  const name       = isM ? '前田さん' : '石川さん';
+  const avatarCls  = isM ? 'maeda-av'    : 'ishikawa-av';
+  const initial    = isM ? 'M' : 'I';
+  const bubbleCls  = isM ? 'maeda-bubble' : 'ishikawa-bubble';
 
   const el = document.createElement('div');
   el.className = 'message';
   el.innerHTML = `
-    <div class="msg-avatar ${avatarClass}">${initial}</div>
+    <div class="msg-avatar ${avatarCls}">${initial}</div>
     <div class="msg-body">
       <div class="msg-sender">${name}</div>
-      <div class="msg-bubble ${bubbleClass}">${escapeHtml(text)}</div>
-    </div>
-  `;
+      <div class="msg-bubble ${bubbleCls}">${escapeHtml(text)}</div>
+    </div>`;
   document.getElementById('chat-messages').appendChild(el);
   scrollToBottom();
   return el;
@@ -195,31 +260,27 @@ function appendUserMessage(text) {
   el.innerHTML = `
     <div class="msg-body" style="align-items:flex-end;display:flex;flex-direction:column;">
       <div class="msg-bubble user-bubble">${escapeHtml(text)}</div>
-    </div>
-  `;
+    </div>`;
   document.getElementById('chat-messages').appendChild(el);
   scrollToBottom();
 }
 
 function appendLoadingDots(reviewer) {
-  const isM = reviewer === 'maeda';
-  const avatarClass = isM ? 'maeda-av' : 'ishikawa-av';
-  const initial = isM ? 'M' : 'I';
-  const name = isM ? '前田さん' : '石川さん';
+  const isM       = reviewer === 'maeda';
+  const avatarCls = isM ? 'maeda-av' : 'ishikawa-av';
+  const initial   = isM ? 'M' : 'I';
+  const name      = isM ? '前田さん' : '石川さん';
 
   const el = document.createElement('div');
   el.className = 'message';
   el.innerHTML = `
-    <div class="msg-avatar ${avatarClass}">${initial}</div>
+    <div class="msg-avatar ${avatarCls}">${initial}</div>
     <div class="msg-body">
       <div class="msg-sender">${name}</div>
       <div class="loading-bubble">
-        <div class="dot"></div>
-        <div class="dot"></div>
-        <div class="dot"></div>
+        <div class="dot"></div><div class="dot"></div><div class="dot"></div>
       </div>
-    </div>
-  `;
+    </div>`;
   document.getElementById('chat-messages').appendChild(el);
   scrollToBottom();
   return el;
@@ -233,8 +294,7 @@ function appendErrorMessage(reviewer) {
       <div class="msg-bubble" style="background:#FFEBEE;color:#C62828;border-top-left-radius:4px;">
         エラーが発生しました。もう一度お試しください。
       </div>
-    </div>
-  `;
+    </div>`;
   document.getElementById('chat-messages').appendChild(el);
 }
 
@@ -245,15 +305,16 @@ function scrollToBottom() {
 
 function escapeHtml(str) {
   return str
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
 /* ─── Event Listeners ───────────────────────────────────── */
 document.addEventListener('DOMContentLoaded', () => {
-  // Enter to send (Shift+Enter for newline)
+  // Initialize phase 1 hint + placeholder
+  selectPhase(1);
+
+  // Enter to send
   document.getElementById('msg-input').addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -261,7 +322,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // Auto-resize message textarea
+  // Auto-resize textarea
   document.getElementById('msg-input').addEventListener('input', (e) => {
     e.target.style.height = 'auto';
     e.target.style.height = Math.min(e.target.scrollHeight, 150) + 'px';

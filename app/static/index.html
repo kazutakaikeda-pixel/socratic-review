@@ -13,7 +13,7 @@
     <div class="header-inner">
       <span class="logo">Socratic Review</span>
       <div id="header-meta" class="hidden">
-        <span class="header-tag">前田さん ＋ 石川さん</span>
+        <span id="header-phase-badge" class="phase-badge"></span>
         <button class="btn-reset" onclick="resetSession()">新しい資料</button>
       </div>
     </div>
@@ -22,18 +22,50 @@
   <!-- ① Input Phase -->
   <div id="input-phase" class="phase active">
     <div class="input-container">
-      <h1 class="title">資料を貼り付けてレビューを受ける</h1>
+
+      <h1 class="title">資料をAIにレビューしてもらう</h1>
       <p class="subtitle">
-        前田さん（全体設計・読み手視点）と石川さん（ページ詳細・技術精度）の2名が、<br>
-        ソクラテス式の問いかけでレビューします。答えではなく、問いを返します。
+        前田さん（全体設計・FACT vs 示唆）と石川さん（ページ詳細・技術精度）の2名が、<br>
+        <strong>GOOD（よかった点）</strong> と <strong>MORE（問いかけ）</strong> の形でフィードバックします。
       </p>
 
+      <!-- Phase Selector -->
+      <div class="phase-steps">
+        <button class="phase-step active" data-phase="1" onclick="selectPhase(1)">
+          <span class="step-num">1</span>
+          <div class="step-labels">
+            <div class="step-name">作成前</div>
+            <div class="step-desc">構想・Notionメモ</div>
+          </div>
+        </button>
+        <div class="step-line"></div>
+        <button class="phase-step" data-phase="2" onclick="selectPhase(2)">
+          <span class="step-num">2</span>
+          <div class="step-labels">
+            <div class="step-name">構成</div>
+            <div class="step-desc">目次・アジェンダ</div>
+          </div>
+        </button>
+        <div class="step-line"></div>
+        <button class="phase-step" data-phase="3" onclick="selectPhase(3)">
+          <span class="step-num">3</span>
+          <div class="step-labels">
+            <div class="step-name">ビジュアル</div>
+            <div class="step-desc">完成に近い資料</div>
+          </div>
+        </button>
+      </div>
+
+      <!-- Phase description -->
+      <div id="phase-hint" class="phase-hint"></div>
+
+      <!-- Reviewer legend -->
       <div class="reviewer-legend">
         <div class="reviewer-pill maeda-pill">
           <span class="pill-icon maeda-icon">M</span>
           <div>
             <div class="pill-name">前田さん</div>
-            <div class="pill-desc">全体構成・読み手の認識・ストーリーライン</div>
+            <div class="pill-desc">全体構成・読み手の認識・FACT vs 示唆</div>
           </div>
         </div>
         <div class="reviewer-pill ishikawa-pill">
@@ -45,10 +77,7 @@
         </div>
       </div>
 
-      <textarea
-        id="doc-input"
-        placeholder="スライドの内容、提案書、定例資料など、レビューしたい内容を貼り付けてください..."
-      ></textarea>
+      <textarea id="doc-input" placeholder=""></textarea>
 
       <button id="start-btn" class="btn-start" onclick="startSession()">
         レビューを受ける
@@ -59,14 +88,9 @@
   <!-- ② Chat Phase -->
   <div id="chat-phase" class="phase">
     <div id="chat-messages"></div>
-
     <div id="input-wrapper">
       <div id="input-row">
-        <textarea
-          id="msg-input"
-          placeholder="返答を入力…（Shift+Enter で改行）"
-          rows="2"
-        ></textarea>
+        <textarea id="msg-input" placeholder="返答を入力…（Shift+Enter で改行）" rows="2"></textarea>
         <button id="send-btn" onclick="sendMessage()">送信</button>
       </div>
     </div>
