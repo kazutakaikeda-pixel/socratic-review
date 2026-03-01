@@ -187,7 +187,7 @@ async function sendMessage() {
         if (currentMsgEl) {
           currentMsgEl.classList.remove('streaming');
           // Apply GOOD/MORE highlighting after streaming
-          renderGoodMore(currentMsgEl.querySelector('.msg-bubble'), fullText);
+          renderFeedback(currentMsgEl.querySelector('.msg-bubble'), fullText);
         }
         currentReviewer = null;
         currentMsgEl    = null;
@@ -208,9 +208,9 @@ async function sendMessage() {
   scrollToBottom();
 }
 
-/* ─── GOOD / MORE Rendering ─────────────────────────────── */
-function renderGoodMore(bubbleEl, text) {
-  if (!text.includes('✓ GOOD') && !text.includes('→ MORE')) return;
+/* ─── GOOD / FIX / THINK Rendering ─────────────────────── */
+function renderFeedback(bubbleEl, text) {
+  if (!text.includes('✓ GOOD') && !text.includes('→ FIX') && !text.includes('? THINK')) return;
 
   const lines = text.split('\n');
   bubbleEl.innerHTML = '';
@@ -222,8 +222,12 @@ function renderGoodMore(bubbleEl, text) {
     if (line.startsWith('✓ GOOD')) {
       span.className   = 'good-line';
       span.textContent = line;
-    } else if (line.startsWith('→ MORE')) {
-      span.className   = 'more-line';
+    } else if (line.startsWith('→ FIX')) {
+      span.className   = 'fix-line';
+      span.style.marginTop = '8px';
+      span.textContent = line;
+    } else if (line.startsWith('? THINK')) {
+      span.className   = 'think-line';
       span.style.marginTop = '8px';
       span.textContent = line;
     } else {

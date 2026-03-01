@@ -191,13 +191,17 @@ header {
   border-radius: 20px;
 }
 
-/* ─── GOOD / MORE text styling ───────────────────────────── */
+/* ─── GOOD / FIX / THINK text styling ────────────────────── */
 /* Applied after streaming via JS */
 .good-line {
   color: #1b5e20;
   font-weight: 500;
 }
-.more-line {
+.fix-line {
+  color: #e65100;
+  font-weight: 500;
+}
+.think-line {
   color: #0d47a1;
   font-weight: 500;
 }
